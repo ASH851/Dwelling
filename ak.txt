@@ -1,0 +1,3 @@
+GCP Project: Ensure you have a GCP project set up.
+Service Account: Create a service account with the necessary permissions for Google Cloud Storage.
+Service Account Key: Download the service account key file (JSON format).
