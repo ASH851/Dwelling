@@ -1,8 +1,24 @@
-name: hello-world
-on: push
+name: Deploy to GCP
+
+on:
+  push:
+    branches:
+      - main  # or your default branch name
+
 jobs:
-  my-job:
+  deploy:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: my-step
-        run: echo "Hello World!"
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy to Compute Engine
+        run: |
+          gcloud compute scp --zone="us-central1-a" --recurse ./* my-webserver:/var/www/html/
