@@ -1,4 +1,4 @@
-name: Deploy to GCP
+name: Deploy to GCP Bucket
 
 on:
   push:
@@ -22,10 +22,29 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Create destination directory
+      - name: Create and Configure Bucket
         run: |
-          gcloud compute ssh my-webserver --zone=us-central1-a --command="sudo mkdir -p /var/www/html && sudo chmod 777 /var/www/html"
+          # Create new bucket if it doesn't exist
+          if ! gsutil ls -b gs://${{ secrets.BUCKET_NAME }} > /dev/null 2>&1; then
+            gsutil mb -l us-central1 gs://${{ secrets.BUCKET_NAME }}
+            echo "Bucket created successfully"
+          else
+            echo "Bucket already exists"
+          fi
+          
+          # Make bucket public (if needed)
+          gsutil iam ch allUsers:objectViewer gs://${{ secrets.BUCKET_NAME }}
 
-      - name: Deploy to Compute Engine
+      - name: Upload Files to Bucket
         run: |
-          gcloud compute scp --zone="us-central1-a" --recurse ./* my-webserver:/var/www/html/
+          # Upload all files from the repository to the bucket
+          gsutil -m cp -r ./* gs://${{ secrets.BUCKET_NAME }}/
+          
+          # List uploaded files
+          echo "Files uploaded to bucket:"
+          gsutil ls gs://${{ secrets.BUCKET_NAME }}/
+
+      - name: List All Buckets
+        run: |
+          echo "All available buckets:"
+          gsutil ls
