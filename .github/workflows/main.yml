@@ -1,4 +1,4 @@
-name: Deploy to GCP Bucket
+name: Deploy to GCP VM
 
 on:
   push:
@@ -22,32 +22,15 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Create Bucket (if doesn't exist)
+      - name: Deploy to VM Instance
         run: |
-          if ! gsutil ls -b gs://${{ secrets.BUCKET_NAME }} > /dev/null 2>&1; then
-            gsutil mb -l us-central1 gs://${{ secrets.BUCKET_NAME }}
-            echo "Bucket created successfully"
-          else
-            echo "Bucket already exists"
-          fi
+          # Create a directory if it doesn't exist
+          gcloud compute ssh ${{ secrets.VM_NAME }} --zone=${{ secrets.ZONE }} \
+            --command="sudo mkdir -p /var/www/html && sudo chown -R \$USER:\$USER /var/www/html"
 
-      - name: Make Bucket Public (if needed)
-        run: |
-          gsutil iam ch allUsers:objectViewer gs://${{ secrets.BUCKET_NAME }}/
-        continue-on-error: true
+          # Copy files to the instance
+          gcloud compute scp --zone=${{ secrets.ZONE }} --recurse ./* ${{ secrets.VM_NAME }}:/var/www/html/
 
-      - name: Upload Files to Bucket
-        run: |
-          echo "Uploading files to bucket..."
-          gsutil -m cp -r ./* gs://${{ secrets.BUCKET_NAME }}/
-          
-          echo "Files uploaded to bucket:"
-          gsutil ls gs://${{ secrets.BUCKET_NAME }}/
-
-      - name: List All Buckets
-        run: |
-          echo "All available buckets:"
-          gsutil ls
-          
-          echo "Contents of current bucket:"
-          gsutil ls -r gs://${{ secrets.BUCKET_NAME }}/**
+          # Set proper permissions and restart Apache
+          gcloud compute ssh ${{ secrets.VM_NAME }} --zone=${{ secrets.ZONE }} \
+            --command="sudo chown -R www-data:www-data /var/www/html/ && sudo systemctl restart apache2"
