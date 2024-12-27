@@ -22,25 +22,25 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Create and Configure Bucket
+      - name: Create Bucket (if doesn't exist)
         run: |
-          # Create new bucket if it doesn't exist
           if ! gsutil ls -b gs://${{ secrets.BUCKET_NAME }} > /dev/null 2>&1; then
             gsutil mb -l us-central1 gs://${{ secrets.BUCKET_NAME }}
             echo "Bucket created successfully"
           else
             echo "Bucket already exists"
           fi
-          
-          # Make bucket public (if needed)
-          gsutil iam ch allUsers:objectViewer gs://${{ secrets.BUCKET_NAME }}
+
+      - name: Make Bucket Public (if needed)
+        run: |
+          gsutil iam ch allUsers:objectViewer gs://${{ secrets.BUCKET_NAME }}/
+        continue-on-error: true
 
       - name: Upload Files to Bucket
         run: |
-          # Upload all files from the repository to the bucket
+          echo "Uploading files to bucket..."
           gsutil -m cp -r ./* gs://${{ secrets.BUCKET_NAME }}/
           
-          # List uploaded files
           echo "Files uploaded to bucket:"
           gsutil ls gs://${{ secrets.BUCKET_NAME }}/
 
@@ -48,3 +48,6 @@ jobs:
         run: |
           echo "All available buckets:"
           gsutil ls
+          
+          echo "Contents of current bucket:"
+          gsutil ls -r gs://${{ secrets.BUCKET_NAME }}/**
