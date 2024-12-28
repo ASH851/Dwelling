@@ -1,4 +1,4 @@
-name: Deploy to GCP VM
+name: Secure Deploy to GCP VM
 
 on:
   push:
@@ -22,9 +22,33 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
+      - name: Get GitHub Actions IP
+        id: ip
+        run: |
+          CURRENT_IP=$(curl -s https://api.ipify.org)
+          echo "ACTION_IP=$CURRENT_IP" >> $GITHUB_ENV
+          echo "Current IP: $CURRENT_IP"
+
+      - name: Create Temporary Firewall Rule
+        run: |
+          RULE_NAME="temp-deploy-$(date +%s)"
+          echo "RULE_NAME=$RULE_NAME" >> $GITHUB_ENV
+          
+          gcloud compute firewall-rules create $RULE_NAME \
+            --direction=INGRESS \
+            --priority=1000 \
+            --network=default \
+            --action=ALLOW \
+            --rules=tcp:22 \
+            --source-ranges=${{ env.ACTION_IP }}/32 \
+            --target-tags=${{ secrets.VM_TAG }}
+          
+          # Wait for firewall rule to propagate
+          sleep 30
+
       - name: Deploy to VM Instance
         run: |
-          # Create a directory if it doesn't exist
+          # Create directory if it doesn't exist
           gcloud compute ssh ${{ secrets.VM_NAME }} --zone=${{ secrets.ZONE }} \
             --command="sudo mkdir -p /var/www/html && sudo chown -R \$USER:\$USER /var/www/html"
 
@@ -34,3 +58,8 @@ jobs:
           # Set proper permissions and restart Apache
           gcloud compute ssh ${{ secrets.VM_NAME }} --zone=${{ secrets.ZONE }} \
             --command="sudo chown -R www-data:www-data /var/www/html/ && sudo systemctl restart apache2"
+
+      - name: Remove Temporary Firewall Rule
+        if: always()
+        run: |
+          gcloud compute firewall-rules delete ${{ env.RULE_NAME }} --quiet
